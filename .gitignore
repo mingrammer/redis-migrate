@@ -1,0 +1,15 @@
+# Compiled source
+__pycache__/
+*.pyc
+
+# IDE and Editor
+.idea/
+.vscode/
+
+# Build and Packages
+redis_migrate.egg-info
+dist/
+build/
+
+# Trash
+.DS_Store
