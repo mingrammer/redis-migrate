@@ -1,8 +1,12 @@
 # Redis Migrate
 
+[![Python Version](https://img.shields.io/badge/python-%3E%3D3.3-blue.svg)](https://docs.python.org/3/index.html) [![Redis Version](https://img.shields.io/badge/redis-%3E%3D2.8-red.svg)](https://redis.io/)
+
 Simple command line tool for redis data migration (minimal functionality)
 
 It is useful when you're not able to use `slaveof` command (e.g. `slaveof` command is not available in ElastiCache) or should migrate from multiple redis servers to a single server.
+
+> It works only for redis >= 2.8
 
 ## Installation
 
@@ -30,6 +34,11 @@ redis-migrate srchost:6380 dsthost --all-keys
 # It works only with `--all-keys`.
 redis-migrate srchost dsthost --all-keys --procs 4
 ```
+
+## Todo
+
+- [ ] Support redis auth
+- [ ] Support key patterns option
 
 ## License
 
