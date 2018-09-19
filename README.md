@@ -34,4 +34,3 @@ redis-migrate srchost dsthost --all-keys --procs 4
 ## License
 
 MIT
->>>>>>> Stashed changes
