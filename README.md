@@ -1,2 +1,2 @@
-# redis-migrate
-Simple command line tool for migrating redis data of various versions
+# Redis Migrate
+Simple command line tool for redis data migration (minimal functionality)
