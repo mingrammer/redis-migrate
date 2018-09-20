@@ -1,6 +1,5 @@
 import datetime
 import sys
-import multiprocessing
 from multiprocessing import Pool, freeze_support
 
 import click
