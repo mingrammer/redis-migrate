@@ -90,6 +90,7 @@ def migrate_all(src, dst, replace=True, nprocs=1):
 def main(src, dst, replace, all_keys, nprocs):
     """
 src: redis://[:password@]hostname[:port][/database] or [:password@]hostname[:port][/database]
+
 dst: redis://[:password@]hostname[:port][/database] or [:password@]hostname[:port][/database]
 """
     if all_keys:
