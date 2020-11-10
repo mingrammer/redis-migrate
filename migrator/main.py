@@ -1,7 +1,9 @@
 from multiprocessing import Pool, freeze_support
+from urllib.parse import urlparse
 
 import click
 import redis
+import re
 from tqdm import tqdm
 
 count = 2500
@@ -9,12 +11,13 @@ count = 2500
 
 def parse_uri(uri):
     """Extracts the host, port and db from an uri"""
-    host, port, db = uri, 6379, 0
-    if len(host.split('/')) == 2:
-        host, db = host.split('/')
-    if len(host.split(':')) == 2:
-        host, port = host.split(':')
-    return host, int(port), int(db)
+    uri = uri if re.match('^redis', uri) else 'redis://{}'.format(uri)
+    uri = urlparse(uri)
+    host = uri.hostname or 'localhost'
+    port = uri.port or 6379
+    db = re.match('/([0-9]+)', uri.path).group(1) if re.match('/([0-9]+)', uri.path) else 0
+    password = uri.password or None
+    return host, int(port), int(db), password
 
 
 def combine_uri(host, port, db):
@@ -29,16 +32,16 @@ def shorten(uri):
 
 def migrate(src, dst, db=None, replace=True, barpos=0):
     """Migrates dataset of a db from source host to destination host"""
-    srchost, srcport, srcdb = parse_uri(src)
-    dsthost, dstport, dstdb = parse_uri(dst)
+    srchost, srcport, srcdb, srcpass = parse_uri(src)
+    dsthost, dstport, dstdb, dstpass = parse_uri(dst)
 
     if db is not None:
         srcdb = dstdb = db
         src = combine_uri(srchost, srcport, srcdb)
         dst = combine_uri(dsthost, dstport, dstdb)
 
-    srcr = redis.StrictRedis(host=srchost, port=srcport, db=srcdb, charset='utf8')
-    dstr = redis.StrictRedis(host=dsthost, port=dstport, db=dstdb, charset='utf8')
+    srcr = redis.StrictRedis(host=srchost, port=srcport, db=srcdb, charset='utf8', password=srcpass)
+    dstr = redis.StrictRedis(host=dsthost, port=dstport, db=dstdb, charset='utf8', password=dstpass)
 
     with tqdm(total=srcr.dbsize(), ascii=True, unit='keys', unit_scale=True, position=barpos) as pbar:
         pbar.set_description('{} → {}'.format(shorten(src), shorten(dst)))
@@ -68,8 +71,8 @@ def migrate(src, dst, db=None, replace=True, barpos=0):
 
 def migrate_all(src, dst, replace=True, nprocs=1):
     """Migrates entire dataset from source host to destination host using multiprocessing"""
-    srchost, srcport, _ = parse_uri(src)
-    srcr = redis.StrictRedis(host=srchost, port=srcport, charset='utf8')
+    srchost, srcport, db, srcpass = parse_uri(src)
+    srcr = redis.StrictRedis(host=srchost, port=srcport, charset='utf8', password=srcpass)
     keyspace = srcr.info('keyspace')
 
     freeze_support()  # for Windows support
@@ -85,6 +88,11 @@ def migrate_all(src, dst, replace=True, nprocs=1):
 @click.option('--all-keys', is_flag=True, default=False, help='Whether to migrate all dataset/keys')
 @click.option('--nprocs', nargs=1, type=int, default=1, help='Maximum number of processes')
 def main(src, dst, replace, all_keys, nprocs):
+    """
+src: redis://[:password@]hostname[:port][/database] or [:password@]hostname[:port][/database]
+
+dst: redis://[:password@]hostname[:port][/database] or [:password@]hostname[:port][/database]
+"""
     if all_keys:
         migrate_all(src, dst, replace=replace, nprocs=nprocs)
     else:

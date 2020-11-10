@@ -69,7 +69,6 @@ setup(
     version=migrator.__version__,
     description=DESCRIPTION,
     long_description=long_description,
-    long_description_content_type='text/markdown',
     author=migrator.__author__,
     author_email=EMAIL,
     url=URL,
