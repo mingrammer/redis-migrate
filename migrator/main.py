@@ -27,21 +27,22 @@ def shorten(uri):
     return '{}...{}'.format(uri[:5], uri[-2:])
 
 
-def migrate(src, dst, db=None, replace=True, barpos=0):
+def migrate(
+    srchost, srcport, srcdb, dsthost, dstport, dstdb,
+    srcpasswd=None, dstpasswd=None, replace=True, barpos=0
+):
     """Migrates dataset of a db from source host to destination host"""
-    srchost, srcport, srcdb = parse_uri(src)
-    dsthost, dstport, dstdb = parse_uri(dst)
-
-    if db is not None:
-        srcdb = dstdb = db
-        src = combine_uri(srchost, srcport, srcdb)
-        dst = combine_uri(dsthost, dstport, dstdb)
-
-    srcr = redis.StrictRedis(host=srchost, port=srcport, db=srcdb, charset='utf8')
-    dstr = redis.StrictRedis(host=dsthost, port=dstport, db=dstdb, charset='utf8')
+    srcr = redis.StrictRedis(
+        host=srchost, port=srcport, db=srcdb, password=srcpasswd, charset='utf8'
+    )
+    dstr = redis.StrictRedis(
+        host=dsthost, port=dstport, db=dstdb, password=dstpasswd, charset='utf8'
+    )
 
     with tqdm(total=srcr.dbsize(), ascii=True, unit='keys', unit_scale=True, position=barpos) as pbar:
-        pbar.set_description('{} → {}'.format(shorten(src), shorten(dst)))
+        display_src = shorten(combine_uri(srchost, srcport, srcdb))
+        display_dst = shorten(combine_uri(dsthost, dstport, dstdb))
+        pbar.set_description('{} → {}'.format(display_src, display_dst))
         cursor = 0
         while True:
             cursor, keys = srcr.scan(cursor, count=count)
@@ -66,26 +67,46 @@ def migrate(src, dst, db=None, replace=True, barpos=0):
                 break
 
 
-def migrate_all(src, dst, replace=True, nprocs=1):
+def migrate_all(
+    srchost, srcport, dsthost, dstport,
+    srcpasswd=None, dstpasswd=None, replace=True, nprocs=1
+):
     """Migrates entire dataset from source host to destination host using multiprocessing"""
-    srchost, srcport, _ = parse_uri(src)
     srcr = redis.StrictRedis(host=srchost, port=srcport, charset='utf8')
     keyspace = srcr.info('keyspace')
 
     freeze_support()  # for Windows support
     pool = Pool(processes=min(len(keyspace.keys()), nprocs))
-    pool.starmap(migrate, [(src, dst, int(db[2:]), replace, i) for i, db in enumerate(keyspace.keys())])
+    pool.starmap(migrate, [
+        (
+            srchost, srcport, int(db[2:]), dsthost, dstport, int(db[2:]),
+            srcpasswd, dstpasswd, replace, i
+        )
+        for i, db in enumerate(keyspace.keys())
+    ])
     print('\n' * max(0, len(keyspace.keys())-1))
 
 
 @click.command(name='redis-migrate')
 @click.argument('src', nargs=1)
 @click.argument('dst', nargs=1)
+@click.option('--src-password', nargs=1, help='Password for src Redis')
+@click.option('--dst-password', nargs=1, help='Password for dst Redis')
 @click.option('--replace/--no-replace', default=True, help='Whether to replace the existing key')
 @click.option('--all-keys', is_flag=True, default=False, help='Whether to migrate all dataset/keys')
 @click.option('--nprocs', nargs=1, type=int, default=1, help='Maximum number of processes')
-def main(src, dst, replace, all_keys, nprocs):
+def main(src, dst, src_password, dst_password, replace, all_keys, nprocs):
+    srchost, srcport, srcdb = parse_uri(src)
+    dsthost, dstport, dstdb = parse_uri(dst)
+
     if all_keys:
-        migrate_all(src, dst, replace=replace, nprocs=nprocs)
+        migrate_all(
+            srchost, srcport, dsthost, dstport,
+            srcpasswd=src_password, dstpasswd=dst_password, replace=replace,
+            nprocs=nprocs
+        )
     else:
-        migrate(src, dst, replace=replace)
+        migrate(
+            srchost, srcport, srcdb, dsthost, dstport, dstdb,
+            srcpasswd=src_password, dstpasswd=dst_password, replace=replace
+        )
