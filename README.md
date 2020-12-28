@@ -18,7 +18,7 @@ pip install redis-migrate
 
 ```console
 # Basic usage
-redis-migrate srchost[:port][/db] dsthost[:port][/db] [--all-keys=false] [--nprocs=1]
+redis-migrate srchost[:port][/db][/password] dsthost[:port][/db][/password] [--all-keys=false] [--nprocs=1]
 
 # Migrate the keys from db 0 of source host to db 1 of destination host.
 redis-migrate srchost dsthost/1
@@ -33,6 +33,9 @@ redis-migrate srchost:6380 dsthost --all-keys
 # You can also set process number to use multiprocessing for speed up.
 # It works only with `--all-keys`.
 redis-migrate srchost dsthost --all-keys --nprocs 4
+
+# The first database of the source host with the password 123456, the tenth database of the target host
+redis-migrate srchost/1/123456 dsthost/10
 ```
 
 ## Todo

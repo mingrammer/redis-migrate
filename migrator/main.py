@@ -9,12 +9,14 @@ count = 2500
 
 def parse_uri(uri):
     """Extracts the host, port and db from an uri"""
-    host, port, db = uri, 6379, 0
+    host, port, db, password = uri, 6379, 0, None
+    if len(host.split('/')) == 3:
+        host, db, password = host.split('/')
     if len(host.split('/')) == 2:
         host, db = host.split('/')
     if len(host.split(':')) == 2:
         host, port = host.split(':')
-    return host, int(port), int(db)
+    return host, int(port), int(db), password
 
 
 def combine_uri(host, port, db):
@@ -29,16 +31,16 @@ def shorten(uri):
 
 def migrate(src, dst, db=None, replace=True, barpos=0):
     """Migrates dataset of a db from source host to destination host"""
-    srchost, srcport, srcdb = parse_uri(src)
-    dsthost, dstport, dstdb = parse_uri(dst)
+    srchost, srcport, srcdb, srcpw = parse_uri(src)
+    dsthost, dstport, dstdb, dstpw = parse_uri(dst)
 
     if db is not None:
         srcdb = dstdb = db
         src = combine_uri(srchost, srcport, srcdb)
         dst = combine_uri(dsthost, dstport, dstdb)
 
-    srcr = redis.StrictRedis(host=srchost, port=srcport, db=srcdb, charset='utf8')
-    dstr = redis.StrictRedis(host=dsthost, port=dstport, db=dstdb, charset='utf8')
+    srcr = redis.StrictRedis(host=srchost, port=srcport, db=srcdb, charset='utf8', password=srcpw)
+    dstr = redis.StrictRedis(host=dsthost, port=dstport, db=dstdb, charset='utf8', password=dstpw)
 
     with tqdm(total=srcr.dbsize(), ascii=True, unit='keys', unit_scale=True, position=barpos) as pbar:
         pbar.set_description('{} → {}'.format(shorten(src), shorten(dst)))
@@ -68,14 +70,14 @@ def migrate(src, dst, db=None, replace=True, barpos=0):
 
 def migrate_all(src, dst, replace=True, nprocs=1):
     """Migrates entire dataset from source host to destination host using multiprocessing"""
-    srchost, srcport, _ = parse_uri(src)
-    srcr = redis.StrictRedis(host=srchost, port=srcport, charset='utf8')
+    srchost, srcport, _, pw = parse_uri(src)
+    srcr = redis.StrictRedis(host=srchost, port=srcport, charset='utf8', password=pw)
     keyspace = srcr.info('keyspace')
 
     freeze_support()  # for Windows support
     pool = Pool(processes=min(len(keyspace.keys()), nprocs))
     pool.starmap(migrate, [(src, dst, int(db[2:]), replace, i) for i, db in enumerate(keyspace.keys())])
-    print('\n' * max(0, len(keyspace.keys())-1))
+    print('\n' * max(0, len(keyspace.keys()) - 1))
 
 
 @click.command(name='redis-migrate')
